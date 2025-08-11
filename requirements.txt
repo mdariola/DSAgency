@@ -1,0 +1,35 @@
+# --- Framework Web y Servidor ---
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# --- Framework de Agentes (CONJUNTO LIMPIO Y FINAL) ---
+# Eliminamos crewai-tools, la fuente de todos los conflictos.
+crewai==0.157.0
+langchain==0.3.27
+langchain-core==0.3.72
+langchain-openai==0.3.28
+openai==1.86.0
+
+# --- DSPy (Sin cambios) ---
+dspy-ai
+
+# --- Base de Datos ---
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# --- Data Science ---
+pandas==2.1.3
+numpy==1.25.2
+matplotlib
+seaborn
+tabulate
+
+# --- Autenticación y Utilidades ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+requests==2.31.0
+python-multipart==0.0.6
+aiofiles
+

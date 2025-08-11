@@ -1,0 +1,27 @@
+# En docker-compose.yml (Versión simplificada sin healthcheck)
+
+services:
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-stable
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml
+    # --- CAMBIO CLAVE AQUÍ ---
+    # Añadimos "--telemetry", "False" a la lista de argumentos del comando.
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--telemetry", "False"]
+
+  crewai-app:
+    build: .
+    env_file:
+      - .env
+    # depends_on simple asegura que el proxy se inicie primero,
+    # lo cual suele ser suficiente en la mayoría de los casos.
+    depends_on:
+      - litellm-proxy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
