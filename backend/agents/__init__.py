@@ -1,9 +1,9 @@
-# En backend/agents/__init__.py
+# /backend/agents/__init__.py (Versión Final y Corregida)
 
-# Importa la nueva función de CrewAI desde agents.py
-from .agents import get_data_analysis_crew
+# 1. Importa la NUEVA CLASE 'ProjectAgents' desde agents.py
+from .agents import ProjectAgents
 
-# Importa el sistema DSPy desde dspy_system.py
+# 2. Mantenemos las importaciones de tu sistema DSPy, ya que son necesarias
 from .dspy_system import (
     get_multi_agent_system,
     auto_analyst,
@@ -13,14 +13,14 @@ from .dspy_system import (
     PLANNER_AGENTS_WITH_DESCRIPTION
 )
 
-# No es estrictamente necesario, pero es una buena práctica
-# definir qué se exporta desde este paquete.
+# 3. Actualizamos la lista de exportación: quitamos lo viejo, añadimos lo nuevo.
 __all__ = [
-    'get_data_analysis_crew',
+    'ProjectAgents',  # <-- AÑADIDO
     'get_multi_agent_system',
     'auto_analyst',
     'auto_analyst_ind',
     'get_agent_description',
     'AGENTS_WITH_DESCRIPTION',
     'PLANNER_AGENTS_WITH_DESCRIPTION'
+    # 'get_data_analysis_crew' ha sido ELIMINADO de esta lista
 ]

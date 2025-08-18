@@ -1,3 +1,5 @@
+# /backend/api/analytics_routes.py
+
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 import pandas as pd
 import io
@@ -8,12 +10,14 @@ import traceback
 # Importamos nuestro session_manager global
 from backend.managers.global_managers import session_manager
 
-router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+# --- CORRECCIÓN: Se ha eliminado el 'prefix="/api/analytics"' de esta línea ---
+# Ahora main.py se encarga de gestionar el prefijo "/api" para todas las rutas.
+router = APIRouter(tags=["analytics"])
 
 UPLOADS_DIR = "uploads"
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-@router.post("/upload-dataset")
+@router.post("/analytics/upload-dataset")
 async def upload_dataset(session_id: str = Form(...), file: UploadFile = File(...)):
     """
     Sube un archivo, lo guarda, genera un resumen de texto y lo almacena 
@@ -34,12 +38,11 @@ async def upload_dataset(session_id: str = Form(...), file: UploadFile = File(..
         # --- LÓGICA CENTRAL ---
         # 1. Leer el archivo con pandas
         if file.filename.endswith('.csv'):
-            # Usamos BytesIO para leer el contenido en memoria sin volver a abrir el archivo
             df = pd.read_csv(io.BytesIO(contents))
         else:
             df = pd.read_excel(io.BytesIO(contents))
 
-        # 2. Generar el resumen de texto (contexto) para DSPy
+        # 2. Generar el resumen de texto (contexto)
         buffer = io.StringIO()
         df.info(buf=buffer)
         info_str = buffer.getvalue()
@@ -67,7 +70,7 @@ async def upload_dataset(session_id: str = Form(...), file: UploadFile = File(..
         return {
             "session_id": session_id,
             "filename": file.filename,
-            "file_path": file_path, # Devolvemos la ruta para referencia
+            "file_path": file_path,
             "columns": df.columns.tolist(),
             "shape": list(df.shape),
             "preview": df.head(5).to_dict(orient="records")
@@ -75,8 +78,6 @@ async def upload_dataset(session_id: str = Form(...), file: UploadFile = File(..
     except Exception as e:
         if os.path.exists(file_path):
             os.remove(file_path)
-        print(traceback.format_exc()) # Imprime el error completo en la consola del servidor
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"No se pudo procesar el archivo: {str(e)}")
 
-# El resto de las rutas viejas de este archivo (get_dataset_info, analyze, etc.) se eliminan 
-# porque ahora todo se manejará a través del endpoint /api/chat.

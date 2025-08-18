@@ -1,5 +1,3 @@
-// En frontend/src/components/ChatInterface.jsx
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Input, Button, Card, Typography, Spin, notification } from 'antd';
 import { SendOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons';
@@ -7,6 +5,54 @@ import { chatApi } from '../services/api';
 
 const { Text, Paragraph } = Typography;
 
+// ===================================================================================
+// === NUEVO COMPONENTE AUXILIAR PARA RENDERIZAR EL CONTENIDO DEL MENSAJE ===
+// ===================================================================================
+/**
+ * Este componente revisa el contenido de un mensaje.
+ * Si detecta una ruta a un gráfico HTML, renderiza el gráfico en un iframe.
+ * De lo contrario, muestra el texto plano.
+ */
+const MessageContent = ({ content }) => {
+  // Expresión regular para buscar la ruta del gráfico en el texto.
+  // Captura rutas como: /charts/chart_d9a35807-7c67-4b97-9c6a-d5df31a30f43.html
+  const chartPathRegex = /(\/charts\/[a-zA-Z0-9_-]+\.html)/;
+  const match = content.match(chartPathRegex);
+
+  // Si no hay coincidencia, renderiza el texto normalmente.
+  if (!match) {
+    return <div style={{ whiteSpace: 'pre-line' }}>{content}</div>;
+  }
+
+  const chartPath = match[0]; // La ruta completa, ej: /charts/chart_....html
+  const precedingText = content.substring(0, match.index); // El texto que el bot escribió antes del enlace
+
+  return (
+    <div>
+      {/* Muestra cualquier texto introductorio que haya generado el agente */}
+      {precedingText && <p style={{ marginBottom: '10px' }}>{precedingText}</p>}
+      
+      {/* El iframe que renderiza el gráfico HTML */}
+      <iframe
+        src={chartPath}
+        title="Generated Chart"
+        style={{ 
+          width: '100%', 
+          minHeight: '450px', // Puedes ajustar esta altura
+          border: '1px solid #f0f0f0', // Un borde sutil para el gráfico
+          borderRadius: '8px'
+        }}
+        // sandbox es un atributo de seguridad importante para iframes
+        sandbox="allow-scripts allow-same-origin" 
+      />
+    </div>
+  );
+};
+
+
+// ===================================================================================
+// === COMPONENTE PRINCIPAL DEL CHAT (ACTUALIZADO) ===
+// ===================================================================================
 const ChatInterface = ({ modelProvider, modelName, initialQuestion = null, onChatStart = () => {}, uploadedFile = null, sessionId }) => {
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState('');
@@ -39,10 +85,8 @@ const ChatInterface = ({ modelProvider, modelName, initialQuestion = null, onCha
         setIsLoading(true);
 
         try {
-            // Prepara el contexto si hay un archivo cargado
-            const requestContext = uploadedFile ? { file_path: uploadedFile.path } : null;
+            const requestContext = uploadedFile ? { file_path: uploadedFile.file_path } : null;
 
-            // Llama a la API usando el sessionId que viene de las props
             const response = await chatApi.sendChatMessage(
                 message,
                 sessionId,
@@ -50,8 +94,6 @@ const ChatInterface = ({ modelProvider, modelName, initialQuestion = null, onCha
                 modelName,
                 requestContext
             );
-
-            // Ya no es necesario actualizar el ID de sesión aquí
             
             const aiMessage = {
                 type: 'ai',
@@ -87,7 +129,7 @@ const ChatInterface = ({ modelProvider, modelName, initialQuestion = null, onCha
 
     return (
         <Card title="Chat Assistant" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flexGrow: 1, overflowY: 'auto', maxHeight: '400px', marginBottom: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+            <div style={{ flexGrow: 1, overflowY: 'auto', maxHeight: '500px', marginBottom: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
                 {messages.length === 0 ? (
                     <div style={{ textAlign: 'center', color: '#555', marginTop: '20px' }}>
                         <RobotOutlined style={{ fontSize: '24px' }} />
@@ -110,7 +152,14 @@ const ChatInterface = ({ modelProvider, modelName, initialQuestion = null, onCha
                                     {' '}
                                     {msg.type === 'user' ? 'You' : (msg.type === 'system' ? 'System' : 'AI Assistant')}
                                 </div>
-                                <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
+                                
+                                {/* APLICAMOS LA LÓGICA DE RENDERIZADO CONDICIONAL AQUÍ */}
+                                {msg.type === 'ai' ? (
+                                    <MessageContent content={msg.content} />
+                                ) : (
+                                    <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
+                                )}
+
                             </div>
                         </div>
                     ))

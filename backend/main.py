@@ -1,15 +1,16 @@
-# En backend/main.py
+# /backend/main.py
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-import os # Asegúrate de que os está importado
+import os
 from backend.utils.logger import Logger
 from backend.managers.global_managers import ai_manager
 from backend.api import chat_routes, analytics_routes, model_routes
 from fastapi.routing import APIRoute
+
 
 logger = Logger("main", see_time=True, console_log=True)
 
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
             api_key="sk-irrelevant"
         )
         logger.log_message("AI Manager configured to use LiteLLM proxy.", level=logging.INFO)
+    
     except Exception as e:
         logger.log_message(f"FATAL: Failed to configure AI Manager with proxy: {e}", level=logging.CRITICAL)
     yield
@@ -38,20 +40,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- CAMBIO CLAVE: INCLUIR ROUTERS DE LA API PRIMERO ---
-app.include_router(chat_routes.router)
-app.include_router(analytics_routes.router)
-app.include_router(model_routes.router)
+# --- CONFIGURACIÓN DE RUTAS CENTRALIZADA Y CORRECTA ---
+app.include_router(chat_routes.router, prefix="/api")
+app.include_router(analytics_routes.router, prefix="/api")
+app.include_router(model_routes.router, prefix="/api")
 
-# --- MONTAR ARCHIVOS ESTÁTICOS AL FINAL DE TODO ---
-# Esto asegura que las rutas de la API siempre tengan prioridad.
+# --- Montar archivos estáticos al final ---
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
-app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+if os.path.exists(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
-
-# --- Bloque de Depuración (puedes quitarlo después de que funcione) ---
-print("\n--- RUTAS REGISTRADAS EN FASTAPI ---")
-for route in app.routes:
-    if isinstance(route, APIRoute):
-        print(f"Ruta: {route.path}, Métodos: {route.methods}, Nombre: {route.name}")
-print("-------------------------------------\n")
+@app.on_event("startup")
+async def startup_event():
+    print("\n--- RUTAS REGISTRADAS EN FASTAPI ---")
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            print(f"Ruta: {route.path}, Métodos: {route.methods}, Nombre: {route.name}")
+    print("-------------------------------------\n")
