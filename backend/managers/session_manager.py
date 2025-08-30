@@ -69,7 +69,7 @@ class SessionManager:
         if session_id in self.sessions:
             return self.sessions[session_id].get(key)
         return None
+    
 
 # Instancia global para ser usada en toda la aplicación
 session_manager = SessionManager()
-

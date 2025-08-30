@@ -1,3 +1,5 @@
+# /backend/tools/code_analysis_tools.py (VERSIÓN FINAL Y ROBUSTA)
+
 import pandas as pd
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -5,6 +7,7 @@ from typing import Type
 import io
 import sys
 
+# El esquema no cambia, sigue siendo correcto.
 class CodeExecutorToolSchema(BaseModel):
     """Input schema for the Code Executor Tool."""
     code: str = Field(..., description="El código Python para ejecutar.")
@@ -17,6 +20,12 @@ class PythonCodeExecutorTool(BaseTool):
     args_schema: Type[BaseModel] = CodeExecutorToolSchema
 
     def _run(self, code: str, file_path: str) -> str:
+        # --- LA ÚNICA LÍNEA QUE NECESITAS AÑADIR ---
+        # Esta línea corrige los saltos de línea dobles (\\n) que a veces genera el LLM,
+        # convirtiéndolos en saltos de línea simples (\n) que Python entiende.
+        code = code.replace('\\n', '\n')
+        # --- FIN DE LA MODIFICACIÓN ---
+        
         try:
             df = pd.read_csv(file_path)
             

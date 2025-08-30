@@ -6,46 +6,40 @@ import io
 import os
 import uuid
 import traceback
+from pathlib import Path
 
 # Importamos nuestro session_manager global
 from backend.managers.global_managers import session_manager
+# Importamos la ruta absoluta correcta desde el nuevo archivo de configuración
+from backend.config import UPLOADS_DIR
 
-# --- CORRECCIÓN: Se ha eliminado el 'prefix="/api/analytics"' de esta línea ---
-# Ahora main.py se encarga de gestionar el prefijo "/api" para todas las rutas.
 router = APIRouter(tags=["analytics"])
-
-UPLOADS_DIR = "uploads"
-os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 @router.post("/analytics/upload-dataset")
 async def upload_dataset(session_id: str = Form(...), file: UploadFile = File(...)):
     """
-    Sube un archivo, lo guarda, genera un resumen de texto y lo almacena 
-    en la sesión del usuario junto con la ruta del archivo.
+    Sube un archivo, lo guarda, genera un resumen y limpia la sesión para un nuevo análisis.
     """
     if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Por favor, sube un CSV o Excel.")
 
-    # Usamos un nombre de archivo único para evitar conflictos
-    unique_filename = f"{uuid.uuid4()}_{file.filename}"
-    file_path = os.path.join(UPLOADS_DIR, unique_filename)
+    file_extension = Path(file.filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_extension}"
+    file_path = UPLOADS_DIR / unique_filename
 
     try:
-        contents = await file.read()
         with open(file_path, "wb") as buffer:
+            contents = await file.read()
             buffer.write(contents)
         
-        # --- LÓGICA CENTRAL ---
-        # 1. Leer el archivo con pandas
         if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(contents))
+            df = pd.read_csv(file_path)
         else:
-            df = pd.read_excel(io.BytesIO(contents))
+            df = pd.read_excel(file_path)
 
-        # 2. Generar el resumen de texto (contexto)
-        buffer = io.StringIO()
-        df.info(buf=buffer)
-        info_str = buffer.getvalue()
+        buffer_info = io.StringIO()
+        df.info(buf=buffer_info)
+        info_str = buffer_info.getvalue()
         
         dataset_context = f"""
         Resumen del conjunto de datos '{file.filename}':
@@ -59,18 +53,21 @@ async def upload_dataset(session_id: str = Form(...), file: UploadFile = File(..
         {df.describe().to_string()}
         """
 
-        # 3. Guardar la RUTA y el RESUMEN en la sesión del usuario
-        session = session_manager.get_or_create_session(session_id)
-        session_manager.update_context(session_id, {
-            "file_path": file_path,
-            "dataset_context": dataset_context
-        })
+        # --- ESTA ES LA SECCIÓN CORREGIDA Y UNIFICADA ---
+        # Creamos un único diccionario con TODO el contexto de la nueva sesión.
+        session_context = {
+            "file_path": str(file_path),          # Usamos la variable correcta 'file_path'
+            "dataset_context": dataset_context,
+            "conversation_history": ""            # Reiniciamos el historial de conversación
+        }
+        # Hacemos UNA SOLA llamada para actualizar el contexto, asegurando la limpieza.
+        session_manager.update_context(session_id, session_context)
+        # --- FIN DE LA CORRECCIÓN ---
         
-        # 4. Devolver una respuesta útil al frontend
         return {
             "session_id": session_id,
             "filename": file.filename,
-            "file_path": file_path,
+            "file_path": str(file_path),
             "columns": df.columns.tolist(),
             "shape": list(df.shape),
             "preview": df.head(5).to_dict(orient="records")
@@ -80,4 +77,73 @@ async def upload_dataset(session_id: str = Form(...), file: UploadFile = File(..
             os.remove(file_path)
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"No se pudo procesar el archivo: {str(e)}")
+    """
+    Sube un archivo, lo guarda en una ruta absoluta, genera un resumen de texto y lo almacena 
+    en la sesión del usuario junto con la ruta del archivo.
+    """
+    if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Por favor, sube un CSV o Excel.")
 
+    # Usamos un nombre de archivo único y pathlib para construir la ruta absoluta
+    file_extension = Path(file.filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_extension}"
+    
+    # Construimos la RUTA ABSOLUTA usando la variable importada de config.py
+    file_path = UPLOADS_DIR / unique_filename
+
+    try:
+        # Guardamos el archivo en la ruta absoluta
+        with open(file_path, "wb") as buffer:
+            contents = await file.read()
+            buffer.write(contents)
+        
+        # Leemos el archivo desde el disco para el análisis (más seguro)
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(file_path)
+        else:
+            df = pd.read_excel(file_path)
+
+        # Generamos el resumen de texto (contexto)
+        buffer_info = io.StringIO()
+        df.info(buf=buffer_info)
+        info_str = buffer_info.getvalue()
+        
+        dataset_context = f"""
+        Resumen del conjunto de datos '{file.filename}':
+        - Primeras 5 filas:
+        {df.head().to_string()}
+
+        - Información de columnas y tipos de datos:
+        {info_str}
+
+        - Resumen estadístico:
+        {df.describe().to_string()}
+        """
+        session_context = {
+            "file_path": absolute_file_path,
+            "dataset_context": dataset_context,
+            "conversation_history": ""  # <-- ¡Esta es la clave! Reiniciamos el historial.
+        }
+        session_manager.update_context(session_id, session_context)
+
+        # Guardamos la RUTA ABSOLUTA (como string) y el RESUMEN en la sesión
+        session = session_manager.get_or_create_session(session_id)
+        session_manager.update_context(session_id, {
+            "file_path": str(file_path),
+            "dataset_context": dataset_context
+        })
+        
+        # Devolvemos una respuesta útil al frontend
+        return {
+            "session_id": session_id,
+            "filename": file.filename,
+            "file_path": str(file_path),
+            "columns": df.columns.tolist(),
+            "shape": list(df.shape),
+            "preview": df.head(5).to_dict(orient="records")
+        }
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"No se pudo procesar el archivo: {str(e)}")

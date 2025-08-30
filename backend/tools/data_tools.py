@@ -10,6 +10,7 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Type
 import dspy # <--- Importar dspy aquí
+import logging
 
 from backend.agents.dspy_system import get_multi_agent_system
 
@@ -31,6 +32,7 @@ class DspyAnalysisTool(BaseTool):
         return code.strip()
 
     def _run(self, user_question: str, file_path: str) -> str:
+        logging.warning(f"RUTA RECIBIDA POR LA HERRAMIENTA: '{file_path}'")
         print(f"--- ⚒️ DspyAnalysisTool (v4-Inyección) iniciada: '{user_question}' ---")
         
         try:

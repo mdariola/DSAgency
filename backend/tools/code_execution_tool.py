@@ -1,11 +1,10 @@
-# /backend/tools/code_execution_tool.py (Versión a prueba de balas)
+# /backend/tools/code_execution_tool.py (VERSIÓN FINAL Y SIMPLIFICADA)
 
 import os
 import traceback
 import pandas as pd
 import plotly.express as px
 import uuid
-import re
 from typing import Type
 from pydantic import BaseModel, Field
 from crewai.tools import BaseTool
@@ -13,35 +12,33 @@ from crewai.tools import BaseTool
 CHARTS_DIR = "static/charts"
 os.makedirs(CHARTS_DIR, exist_ok=True)
 
-class CodeExecutionToolSchema(BaseModel):
+# --- CAMBIO 1: El Esquema ahora pide 'file_path' directamente, igual que la otra herramienta ---
+class GraphingToolSchema(BaseModel):
+    """Input schema for the Graphing Tool."""
     code: str = Field(..., description="El código Python a ejecutar para generar un gráfico con Plotly.")
-    context: str = Field(..., description="El contexto completo que contiene la ruta del archivo y otros detalles del dataset.")
+    file_path: str = Field(..., description="La ruta absoluta al archivo CSV que debe ser analizado.")
 
 class CodeExecutionTool(BaseTool):
     name: str = "Ejecutor de Código Python para Gráficos"
     description: str = """Ejecuta código Python para generar visualizaciones de datos con Plotly."""
-    args_schema: Type[BaseModel] = CodeExecutionToolSchema
+    args_schema: Type[BaseModel] = GraphingToolSchema
 
-    def _find_file_path(self, context: str) -> str | None:
-        """Usa una expresión regular para encontrar de forma fiable la ruta del archivo buscando la etiqueta 'file_path:'."""
-        # Busca el patrón "file_path: uploads/..." y captura la ruta.
-        match = re.search(r"file_path:\s*(uploads/[a-zA-Z0-9\-_./]+\.(csv|xlsx|xls))", context)
-        if match:
-            return match.group(1).strip()
-        return None
-
-    def _run(self, code: str, context: str) -> str:
-        file_path = self._find_file_path(context)
+    # --- CAMBIO 2: La función _run ahora acepta 'file_path' directamente ---
+    def _run(self, code: str, file_path: str) -> str:
         
-        print(f"--- ⚒️ CodeExecutionTool iniciada ---")
-        print(f"--- 🔍 Buscando 'file_path:' en el contexto... Encontrada: '{file_path}' ---")
+        # Añadimos la limpieza de código que nos faltaba
+        code = code.replace('\\n', '\n')
+        
+        print(f"--- ⚒️ CodeExecutionTool (Gráficos) iniciada ---")
+        print(f"--- 📄 Ruta de archivo recibida: '{file_path}' ---")
 
         if not file_path or not os.path.exists(file_path):
-            return f"Error: No se pudo encontrar una etiqueta 'file_path:' con una ruta válida en el contexto o el archivo no existe. Contexto recibido: {context[:250]}..."
+            return f"Error: La ruta del archivo '{file_path}' no es válida o el archivo no existe."
 
         try:
             df = pd.read_csv(file_path)
             local_namespace = {'df': df, 'px': px}
+            
             exec(code, {}, local_namespace)
 
             if 'fig' not in local_namespace:
@@ -59,5 +56,5 @@ class CodeExecutionTool(BaseTool):
 
         except Exception as e:
             error_trace = traceback.format_exc()
-            print(f"--- ❌ Error ejecutando código: {error_trace} ---")
-            return f"Ocurrió un error al ejecutar el código de Python: {e}\nTraceback:\n{error_trace}"
+            print(f"--- ❌ Error ejecutando código de gráfico: {error_trace} ---")
+            return f"Ocurrió un error al ejecutar el código para el gráfico: {e}"

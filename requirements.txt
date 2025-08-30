@@ -25,6 +25,9 @@ matplotlib
 seaborn
 tabulate
 plotly
+scikit-learn
+joblib
+
 
 
 # --- Autenticación y Utilidades ---
