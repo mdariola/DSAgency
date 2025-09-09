@@ -275,6 +275,9 @@
         </div>
 
         <div class="workflow-container">
+            <!-- Mermaid JS -->
+            <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+            <script>mermaid.initialize({ startOnLoad: true, securityLevel: 'loose', theme: 'default' });</script>
             <!-- Arquitectura General -->
             <div class="section">
                 <h2 class="section-title">🏗️ Arquitectura del Sistema</h2>
@@ -345,6 +348,49 @@
             <div class="section">
                 <h2 class="section-title">🔄 Flujo de Trabajo Principal</h2>
                 <div class="flow-diagram">
+                    <!-- Diagrama de Secuencia (Mermaid) -->
+                    <div class="section" style="margin-bottom:20px;">
+<div class="mermaid">
+sequenceDiagram
+    participant U as Usuario
+    participant FE as Frontend (React)
+    participant BE as Backend (FastAPI)
+    participant SM as SessionManager
+    participant AIM as AIManager/CrewAI
+    participant LLP as LiteLLM Proxy
+
+    U->>FE: Abre app
+    FE->>FE: Genera sessionId (UUID)
+
+    U->>FE: Sube archivo (CSV/Excel)
+    FE->>BE: POST /api/analytics/upload-dataset (multipart + session_id)
+    BE->>BE: Guarda en /app/uploads y analiza con Pandas
+    BE->>SM: update_context(session, {file_path, dataset_context, conversation_history:""})
+    BE-->>FE: { file_path, columns, shape, preview }
+
+    FE->>BE: GET /api/models/providers (UI ModelSelector)
+    BE->>LLP: GET /v1/models (Bearer master_key)
+    LLP-->>BE: Lista de modelos (provider/model)
+    BE-->>FE: providers
+
+    FE->>BE: GET /api/models/current?session_id=... (modelo por sesión)
+    BE->>SM: get_or_create_session
+    BE-->>FE: { provider, model }
+    FE->>BE: POST /api/models/configure?session_id=... {provider, model}
+    BE->>SM: session["current_model"]=provider/model
+
+    U->>FE: Envía mensaje por chat
+    FE->>BE: POST /api/chat { session_id, message }
+    BE->>SM: Recupera {file_path, dataset_context, conversation_history, current_model}
+    BE->>AIM: run_crew(..., model=current_model)
+    AIM->>LLP: ChatOpenAI(model=provider/model)
+    AIM->>AIM: Ejecuta agentes/tareas (incluye Modelador Predictivo)
+    AIM-->>BE: Respuesta
+    BE->>SM: Append conversation_history
+    BE-->>FE: { response }
+</div>
+                    </div>
+
                     <div class="flow-step">
                         <div class="step-number">1</div>
                         <div class="step-content">
@@ -422,6 +468,30 @@
                 <h2 class="section-title">🤖 Sistema de Agentes Inteligentes</h2>
                 <div class="agent-system">
                     <h3 style="margin-bottom: 20px;">Arquitectura Multi-Agente con CrewAI</h3>
+                    <!-- Diagrama de Componentes (Mermaid) -->
+                    <div class="mermaid" style="background:white;color:black;padding:10px;border-radius:8px;">
+flowchart LR
+  subgraph Client
+    FE[React Frontend]\nChatInterface / FileUploader / ModelSelector
+  end
+  subgraph Server
+    BE[FastAPI Backend]\nchat_routes / analytics_routes / model_routes
+    SM[(SessionManager)]
+    AIM[AIManager\nCrewAI]
+  end
+  subgraph Infra
+    LLP[LiteLLM Proxy]
+    Models[Model Providers\n(OpenAI, Anthropic,...)]
+    Store[/Volumes: /app/uploads/]
+  end
+
+  FE -->|Axios /api| BE
+  BE --> SM
+  BE --> AIM
+  BE --> Store
+  AIM --> LLP
+  LLP --> Models
+                    </div>
                     <div class="agent-grid">
                         <div class="agent-card">
                             <div class="agent-title">🎯 Project Director</div>
@@ -448,6 +518,13 @@
                             <div class="agent-title">📈 Visualization Expert</div>
                             <div class="agent-description">
                                 Experto en visualización de datos que crea gráficos y visualizaciones usando Plotly. Genera representaciones visuales claras de los análisis.
+                            </div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-title">🤖 Modelador Predictivo</div>
+                            <div class="agent-description">
+                                Entrena modelos (con `ModelTrainingTool`) y realiza predicciones (con `ModelPredictionTool`).
+                                Usa `file_path` y, para predicción, `model_path` desde el contexto.
                             </div>
                         </div>
                     </div>

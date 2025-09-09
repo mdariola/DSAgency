@@ -34,7 +34,7 @@ import {
 import { modelsApi } from '../services/api';
 import { InfoIcon, ViewIcon, ViewOffIcon, CheckIcon, WarningIcon } from '@chakra-ui/icons';
 
-const ModelSelector = ({ onModelChange }) => {
+const ModelSelector = ({ onModelChange, sessionId }) => {
   const [providers, setProviders] = useState({});
   const [currentProvider, setCurrentProvider] = useState('');
   const [currentModel, setCurrentModel] = useState('');
@@ -86,7 +86,7 @@ const ModelSelector = ({ onModelChange }) => {
         setProviders(providersObject);
         // --- FIN DE LA CORRECCIÓN CLAVE ---
 
-        const currentModelResponse = await modelsApi.getCurrentModel();
+        const currentModelResponse = await modelsApi.getCurrentModel(sessionId);
         // Aseguramos que el provider sea un string, ya que la API puede devolver un objeto
         const providerName = typeof currentModelResponse.data.provider === 'object' 
           ? currentModelResponse.data.provider.name 
@@ -117,7 +117,7 @@ const ModelSelector = ({ onModelChange }) => {
     };
 
     fetchData();
-  }, [toast]);
+  }, [sessionId, toast]);
 
   const handleProviderChange = (e) => {
     const providerName = e.target.value;
@@ -137,7 +137,7 @@ const ModelSelector = ({ onModelChange }) => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      await modelsApi.configureModel(selectedProvider, selectedModel);
+      await modelsApi.configureModel(selectedProvider, selectedModel, sessionId);
       
       setCurrentProvider(selectedProvider);
       setCurrentModel(selectedModel);

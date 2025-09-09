@@ -23,12 +23,8 @@ async def lifespan(app: FastAPI):
         from backend.config import UPLOADS_DIR
         logger.log_message(f"Upload directory ensured at: {UPLOADS_DIR}", level=logging.INFO)
         
-        ai_manager.configure_model_with_proxy(
-            model="gpt-4o-mini",
-            api_base="http://litellm-proxy:4000",
-            api_key="sk-irrelevant"
-        )
-        logger.log_message("AI Manager configured to use LiteLLM proxy.", level=logging.INFO)
+        logger.log_message("AI Manager is ready for dynamic model requests.", level=logging.INFO)
+
     
     except Exception as e:
         logger.log_message(f"FATAL: Failed to configure AI Manager with proxy: {e}", level=logging.CRITICAL)

@@ -1,6 +1,5 @@
-# /backend/managers/ai_manager.py (VERSIÓN FINAL CORREGIDA)
+# /backend/managers/ai_manager.py (VERSIÓN CORREGIDA Y DINÁMICA)
 
-import dspy
 from langchain_openai import ChatOpenAI
 from typing import Optional
 import logging
@@ -8,49 +7,47 @@ import logging
 from backend.agents.agents import ProjectAgents
 from crewai import Crew, Process, Task
 
+logging.basicConfig(level=logging.INFO)
+
 class AIManager:
     def __init__(self):
-        self.dspy_lm = None
-        self.chat_client = None
-        self.configured = False
-        self.api_base = None
-        self.current_provider = None
-        self.current_model = None
-        logging.basicConfig(level=logging.INFO)
+        # El manager ya no guarda un estado de LLM. Ahora es más simple.
+        logging.info("AIManager initialized (ready for dynamic model requests).")
 
-    def configure_model_with_proxy(self, model: str, api_base: str, api_key: str):
-        self.api_base = api_base
+    def _get_llm_instance(self, model_full_name: str) -> ChatOpenAI:
+        """
+        FUNCIÓN CLAVE: Crea y devuelve una nueva instancia de ChatOpenAI bajo demanda,
+        configurada para usar el proxy de LiteLLM con el modelo especificado.
+        """
+        return ChatOpenAI(
+            model=model_full_name,
+            # La base_url siempre apunta al proxy
+            openai_api_base="http://litellm-proxy:4000",
+            # La api_key es manejada por el proxy, por lo que este valor es irrelevante
+            openai_api_key="sk-irrelevant",
+            temperature=0.2
+        )
+
+    # La firma del método ahora incluye 'model' para saber cuál LLM crear
+    def run_crew(self, user_input: str, dataset_context: str, conversation_history: str, file_path: Optional[str], model: str) -> str:
+        logging.info(f"Executing crew with dynamically configured model: {model}")
+        
+        # 1. Crea la instancia del LLM justo para esta tarea específica
         try:
-            self.chat_client = ChatOpenAI(model=model, openai_api_base=api_base, openai_api_key=api_key, temperature=0.2)
-            # Nota: DSPy puede que no necesite reconfiguración en cada ejecución si el LLM es constante.
-            # Esta configuración inicial puede ser suficiente.
-            self.configured = True
-            logging.info("AIManager configured successfully via proxy.")
+            llm_instance = self._get_llm_instance(model)
         except Exception as e:
-            self.configured = False
-            logging.error(f"ERROR: AIManager failed to configure. Details: {e}", exc_info=True)
-            raise e
+            logging.error(f"FATAL: Failed to create LLM instance for model {model}. Details: {e}", exc_info=True)
+            return f"Error: No se pudo crear el cliente de IA para el modelo {model}."
 
-    def is_configured(self) -> bool:
-        return self.configured
-
-    # --- INICIO DE LA MODIFICACIÓN CLAVE ---
-    # 1. Añadimos 'file_path: Optional[str]' a la firma de la función.
-    def run_crew(self, user_input: str, dataset_context: str, conversation_history: str, file_path: Optional[str]) -> str:
-        if not self.is_configured():
-            logging.error("FATAL: run_crew called but AIManager is not configured.")
-            return "Error: El gestor de IA no está configurado. Revisa los logs de arranque del servidor."
-
-        agents_factory = ProjectAgents(llm=self.chat_client)
+        # 2. Crea tus agentes usando la instancia de LLM recién creada
+        agents_factory = ProjectAgents(llm=llm_instance)
         director_proyecto = agents_factory.project_director()
         analista_datos = agents_factory.data_analyst()
         investigador_web = agents_factory.web_researcher()
         visualizador_datos = agents_factory.data_visualization_expert()
         cientifico_datos = agents_factory.predictive_modeler()
 
-
-        # 2. Construimos el contexto de forma inteligente.
-        #    Añadimos la información de la ruta del archivo SOLO SI EXISTE.
+        # 3. Construye el contexto completo (tu lógica aquí es perfecta)
         file_context_info = ""
         if file_path:
             file_context_info = f"""
@@ -60,22 +57,19 @@ La ruta ABSOLUTA del archivo que el usuario ha cargado es: '{file_path}'
 Cualquier agente que necesite leer o analizar el archivo DEBE usar esta ruta exacta.
 ---
 """
-        
         full_context = f"""{file_context_info}
 CONTEXTO DEL CONJUNTO DE DATOS (resumen):
 ---
 {dataset_context}
 ---
-
 HISTORIAL DE LA CONVERSACIÓN ANTERIOR:
 ---
 {conversation_history}
 ---
-
 NUEVA PETICIÓN DEL USUARIO:
 {user_input}"""
-        # --- FIN DE LA MODIFICACIÓN CLAVE ---
 
+        # 4. Define la tarea y el Crew (sin cambios)
         project_management_task = Task(
             description=full_context,
             expected_output="Una respuesta final y completa que satisfaga la petición del usuario, basada en la colaboración del equipo.",
@@ -83,7 +77,7 @@ NUEVA PETICIÓN DEL USUARIO:
         )
 
         crew = Crew(
-            agents=[director_proyecto, analista_datos, investigador_web, visualizador_datos,cientifico_datos],
+            agents=[director_proyecto, analista_datos, investigador_web, visualizador_datos, cientifico_datos],
             tasks=[project_management_task],
             process=Process.sequential,
             verbose=True
@@ -91,7 +85,6 @@ NUEVA PETICIÓN DEL USUARIO:
 
         crew_output = crew.kickoff()
         
-        # CrewAI v0.28.8+ devuelve un objeto, extraemos el resultado crudo.
         if hasattr(crew_output, 'raw'):
-             return crew_output.raw
+            return crew_output.raw
         return str(crew_output)

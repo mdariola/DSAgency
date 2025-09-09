@@ -1,19 +1,19 @@
-# ------------------------------------------------------------------
-# CONFIGURACIÓN MÍNIMA Y SEGURA PARA EVITAR ERRORES DE BASE DE DATOS
-# ------------------------------------------------------------------
+# litellm-config.yaml (VERSIÓN 100% CORREGIDA)
 
 model_list:
-  - model_name: gpt-4o-mini
+  # El model_name ahora incluye el proveedor para que el backend lo pueda procesar
+  - model_name: openai/gpt-4o-mini
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
-  - model_name: claude-3-5-sonnet-20240620
+  - model_name: anthropic/claude-3-5-sonnet-20240620
     litellm_params:
       model: anthropic/claude-3-5-sonnet-20240620
       api_key: os.environ/ANTHROPIC_API_KEY
 
-# Hemos eliminado las secciones 'general_settings' y 'litellm_settings' 
-# para usar los valores por defecto de LiteLLM, que no requieren una base de datos.
-# Esto es la forma más robusta de solucionar el error "No connected db".
+# Esta sección desactiva la autenticación del proxy.
+# Usa espacios normales (dos espacios) para la sangría.
+general_settings:
+  master_key: "super-secreto-1234"
 

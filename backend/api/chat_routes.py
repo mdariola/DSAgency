@@ -1,4 +1,4 @@
-# /backend/api/chat_routes.py (VERSIÓN FINAL CORREGIDA)
+# /backend/api/chat_routes.py (VERSIÓN FINAL CONECTADA)
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -22,15 +22,25 @@ async def handle_chat_message(request: ChatRequest):
         dataset_context = session.get("dataset_context", "")
         conversation_history = session.get("conversation_history", "")
 
-        # Ejecutamos el crew, ahora sí, pasándole la ruta del archivo.
+        # --- INICIO DE LA CORRECCIÓN ---
+
+        # 1. OBTÉN EL MODELO DE LA SESIÓN
+        #    Esta línea lee el modelo que el usuario guardó con el ModelSelector.
+        #    Si no ha guardado ninguno, usa 'openai/gpt-4o-mini' como default.
+        current_model = session.get('current_model', 'openai/gpt-4o-mini')
+
+        # Ejecutamos el crew, ahora sí, pasándole TODOS los parámetros requeridos.
         result = ai_manager.run_crew(
             user_input=request.message,
-            file_path=file_path,  # <-- ¡EL MAPA DEL TESORO!
+            file_path=file_path,
             dataset_context=dataset_context,
-            conversation_history=conversation_history
+            conversation_history=conversation_history,
+            model=current_model  # <-- 2. PASA EL MODELO AL AIManager
         )
 
-        # Actualizamos el historial de la conversación
+        # --- FIN DE LA CORRECCIÓN ---
+
+        # Actualizamos el historial de la conversación (tu lógica aquí es perfecta)
         new_history_entry = f"User: {request.message}\nAssistant: {result}\n"
         updated_history = conversation_history + new_history_entry
         
